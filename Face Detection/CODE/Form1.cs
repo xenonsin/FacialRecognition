@@ -1,95 +1,56 @@
-//----------------------------------------------------------------------------
-//  Copyright (C) 2004-2015 by EMGU Corporation. All rights reserved.       
-//----------------------------------------------------------------------------
-
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Text;
+﻿using System;
 using System.Windows.Forms;
-using System.Windows.Threading;
+using System.Drawing;
 using Emgu.CV;
-using Emgu.CV.CvEnum;
-using Emgu.CV.Structure;
-using Emgu.CV.Util;
-using Emgu.CV.VideoSurveillance;
 using Emgu.Util;
+using Emgu.CV.Structure;
+using Emgu.CV.CvEnum;
 
-namespace MotionDetection
+namespace opencvtut
 {
     public partial class Form1 : Form
     {
-        private Capture _capture;
-        DispatcherTimer timer;
-         private CascadeClassifier _cascadeClassifier;
+        private Capture cap;
+        private static readonly CascadeClassifier haar = new CascadeClassifier("haarcascade_frontalface_alt_tree.xml");
+
 
         public Form1()
         {
             InitializeComponent();
-
-            //try to create the capture
-            if (_capture == null)
-            {
-                try
-                {
-                    _capture = new Capture();
-                }
-                catch (NullReferenceException excpt)
-                {   //show errors if there is any
-                    MessageBox.Show(excpt.Message);
-                }
-            }
-
-            if (_capture != null) //if camera capture has been successfully created
-            {
-                //_capture.ImageGrabbed += ProcessFrame;
-                _capture.Start();
-            }
-            _cascadeClassifier = new CascadeClassifier(Application.StartupPath + "/haarcascade_frontalface_default.xml");
-            timer = new DispatcherTimer();
-            timer.Tick += new EventHandler(timer_Tick);
-            timer.Interval = new TimeSpan(0, 0, 0, 0, 1);
-            timer.Start();
         }
 
-        void timer_Tick(object sender, EventArgs e)
+        private void timer1_Tick(object sender, EventArgs e)
         {
-            using (var imageFrame = _capture.QueryFrame().ToImage<Bgr, Byte>())
+            using (Image<Gray, byte> grayImage = cap.Convert<Gray, byte>();)
             {
-                if (imageFrame != null)
+                if (nextFrame != null)
                 {
-                    var grayframe = imageFrame.Convert<Gray, byte>();
-                    var faces = _cascadeClassifier.DetectMultiScale(grayframe, 1.1, 10, Size.Empty);
-                        //the actual face detection happens here
+                    // there's only one channel (greyscale), hence the zero index
+                    //var faces = nextFrame.DetectHaarCascade(haar)[0];
+                    Image<Gray, byte> grayframe = nextFrame.Convert<Gray, byte>();
+                    var faces =
+                            grayframe.DetectHaarCascade(
+                                    haar, 1.4, 4,
+                                    HAAR_DETECTION_TYPE.DO_CANNY_PRUNING,
+                                    new Size(nextFrame.Width / 8, nextFrame.Height / 8)
+                                    )[0];
+
                     foreach (var face in faces)
                     {
-                        imageFrame.Draw(face, new Bgr(Color.BurlyWood), 3);
-                            //the detected face(s) is highlighted here using a box that is drawn around it/them
-
+                        nextFrame.Draw(face.rect, new Bgr(0, double.MaxValue, 0), 3);
                     }
+                    pictureBox1.Image = nextFrame.ToBitmap();
                 }
-                imgCamUser.Image = imageFrame;
             }
         }
 
-       
-
-        /// <summary>
-        /// Clean up any resources being used.
-        /// </summary>
-        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
-        protected override void Dispose(bool disposing)
+        private void Form1_Load(object sender, EventArgs e)
         {
-
-            if (disposing && (components != null))
-            {
-                components.Dispose();
-            }
-
-            base.Dispose(disposing);
+            // passing 0 gets zeroth webcam
+            cap = new Capture(0);
+            // adjust path to find your xml
+            haar = new HaarCascade(
+    "..\\..\\..\\..\\lib\\haarcascade_frontalface_alt2.xml");
         }
-
     }
 }
